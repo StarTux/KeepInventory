@@ -56,12 +56,12 @@ public final class KeepInventoryPlugin extends JavaPlugin implements Listener {
         if (!supportMiniMap) return;
         Map<String, Object> map = new HashMap<>();
         map.put("Type", "Boolean");
-        map.put("Value", getOptOuts().contains(uuid));
+        map.put("Value", !getOptOuts().contains(uuid));
         map.put("Priority", 0);
-        map.put("DisplayName", "Drop Inventory on Death");
+        map.put("DisplayName", "Keep Inventory on Death");
         Runnable onUpdate = () -> {
             final boolean v = map.get("Value") == Boolean.TRUE;
-            if (v) {
+            if (!v) {
                 getOptOuts().add(uuid);
             } else {
                 getOptOuts().remove(uuid);
