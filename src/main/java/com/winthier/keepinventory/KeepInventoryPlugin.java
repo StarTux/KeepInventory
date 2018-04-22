@@ -19,7 +19,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.metadata.FixedMetadataValue;
+import org.bukkit.metadata.LazyMetadataValue;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class KeepInventoryPlugin extends JavaPlugin implements Listener {
@@ -52,26 +52,28 @@ public final class KeepInventoryPlugin extends JavaPlugin implements Listener {
     }
 
     private void setupPlayer(Player player) {
-        final UUID uuid = player.getUniqueId();
         if (!supportMiniMap) return;
-        Map<String, Object> map = new HashMap<>();
-        map.put("Type", "Boolean");
-        map.put("Value", !getOptOuts().contains(uuid));
-        map.put("Priority", 0);
-        map.put("DisplayName", "Keep Inventory on Death");
-        Runnable onUpdate = () -> {
-            final boolean v = map.get("Value") == Boolean.TRUE;
-            if (!v) {
-                getOptOuts().add(uuid);
-            } else {
-                getOptOuts().remove(uuid);
-            }
-            saveOptOuts();
-        };
-        map.put("OnUpdate", onUpdate);
-        List<Map> list = new ArrayList<>();
-        list.add(map);
-        player.setMetadata("MiniMapSettings", new FixedMetadataValue(this, list));
+        final UUID uuid = player.getUniqueId();
+        player.setMetadata("MiniMapSettings", new LazyMetadataValue(this, LazyMetadataValue.CacheStrategy.NEVER_CACHE, () -> {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("Type", "Boolean");
+                    map.put("Value", !getOptOuts().contains(uuid));
+                    map.put("Priority", 0);
+                    map.put("DisplayName", "Keep Inventory on Death");
+                    Runnable onUpdate = () -> {
+                        final boolean v = map.get("Value") == Boolean.TRUE;
+                        if (!v) {
+                            getOptOuts().add(uuid);
+                        } else {
+                            getOptOuts().remove(uuid);
+                        }
+                        saveOptOuts();
+                    };
+                    map.put("OnUpdate", onUpdate);
+                    List<Map> list = new ArrayList<>();
+                    list.add(map);
+                    return list;
+        }));
     }
 
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
