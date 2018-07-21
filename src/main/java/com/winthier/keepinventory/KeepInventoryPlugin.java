@@ -117,7 +117,7 @@ public final class KeepInventoryPlugin extends JavaPlugin implements Listener {
 
     Set<UUID> getOptOuts() {
         if (optOuts == null) {
-            optOuts = new HashSet();
+            optOuts = new HashSet<>();
             YamlConfiguration config = YamlConfiguration.loadConfiguration(optOutsFile());
             Iterator iterator = config.getStringList("optouts").iterator();
             do {
@@ -139,7 +139,7 @@ public final class KeepInventoryPlugin extends JavaPlugin implements Listener {
     void saveOptOuts() {
         if (optOuts == null) return;
         YamlConfiguration config = new YamlConfiguration();
-        List list = new ArrayList();
+        List<String> list = new ArrayList<>();
         UUID uuid;
         for (Iterator iterator = optOuts.iterator(); iterator.hasNext(); list.add(uuid.toString())) {
             uuid = (UUID)iterator.next();
