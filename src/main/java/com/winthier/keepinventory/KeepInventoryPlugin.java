@@ -42,6 +42,7 @@ public final class KeepInventoryPlugin extends JavaPlugin implements Listener {
             return;
         } else {
             event.setKeepInventory(true);
+            event.getDrops().clear();
             return;
         }
     }
