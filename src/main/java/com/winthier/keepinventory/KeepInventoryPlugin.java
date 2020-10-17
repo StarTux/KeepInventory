@@ -78,7 +78,7 @@ public final class KeepInventoryPlugin extends JavaPlugin implements Listener {
     }
 
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        Player player = (sender instanceof Player) ? (Player)sender : null;
+        Player player = (sender instanceof Player) ? (Player) sender : null;
         if (player == null) {
             sender.sendMessage("Player expected");
             return true;
@@ -123,7 +123,7 @@ public final class KeepInventoryPlugin extends JavaPlugin implements Listener {
             Iterator iterator = config.getStringList("optouts").iterator();
             do {
                 if (!iterator.hasNext()) break;
-                String entry = (String)iterator.next();
+                String entry = (String) iterator.next();
                 UUID uuid;
                 try {
                     uuid = UUID.fromString(entry);
@@ -143,7 +143,7 @@ public final class KeepInventoryPlugin extends JavaPlugin implements Listener {
         List<String> list = new ArrayList<>();
         UUID uuid;
         for (Iterator iterator = optOuts.iterator(); iterator.hasNext(); list.add(uuid.toString())) {
-            uuid = (UUID)iterator.next();
+            uuid = (UUID) iterator.next();
         }
         config.set("optouts", list);
         try {
