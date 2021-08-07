@@ -65,7 +65,7 @@ public final class KeepInventoryPlugin extends JavaPlugin implements Listener {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String label, String[] args) {
         return args.length == 1
-            ? Stream.of("on", "off").filter(a -> args[0].contains(a)).collect(Collectors.toList())
+            ? Stream.of("on", "off").filter(a -> a.contains(args[0])).collect(Collectors.toList())
             : Collections.emptyList();
     }
 
