@@ -87,6 +87,7 @@ public final class KeepInventoryPlugin extends JavaPlugin implements Listener {
         switch (player.getWorld().getDifficulty()) {
         case PEACEFUL: case EASY:
             event.setKeepLevel(true);
+            event.setDroppedExp(0);
             break;
         case NORMAL:
             event.setNewLevel(Math.max(0, player.getLevel() - 1));
