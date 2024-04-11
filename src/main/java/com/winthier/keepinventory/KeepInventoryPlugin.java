@@ -1,18 +1,10 @@
 package com.winthier.keepinventory;
 
-import com.google.gson.Gson;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
+import com.winthier.connect.Redis;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.GameRule;
 import org.bukkit.command.Command;
@@ -21,16 +13,29 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
+import static net.kyori.adventure.text.Component.text;
+import static net.kyori.adventure.text.Component.textOfChildren;
+import static net.kyori.adventure.text.event.ClickEvent.suggestCommand;
+import static net.kyori.adventure.text.format.NamedTextColor.*;
+import static net.kyori.adventure.text.format.TextDecoration.ITALIC;
 
 public final class KeepInventoryPlugin extends JavaPlugin implements Listener {
-    private OptOuts optOuts = null;
-    private Gson gson = new Gson();
+    private final OptOuts optOuts = new OptOuts();
 
     @Override
     public void onEnable() {
-        optOuts = loadOptOuts();
         Bukkit.getPluginManager().registerEvents(this, this);
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            loadOptOut(player, () -> { });
+        }
+    }
+
+    @Override
+    public void onDisable() {
+        optOuts.clear();
     }
 
     @Override
@@ -42,19 +47,17 @@ public final class KeepInventoryPlugin extends JavaPlugin implements Listener {
         }
         if (args.length > 1) return false;
         if (args.length == 0) {
-            player.sendMessage(isOptedOut(player)
-                               ? Component.text("You lose your inventory when you die", NamedTextColor.RED)
-                               : Component.text("You keep your inventory when you die", NamedTextColor.GREEN));
+            notify(player);
             return true;
         }
         switch (args[0]) {
         case "on":
-            setOptedOut(player, false);
-            player.sendMessage(Component.text("You will keep your inventory when you die", NamedTextColor.GREEN));
+            optOuts.remove(player);
+            storeOptOut(player, false, () -> notify(player));
             return true;
         case "off":
-            setOptedOut(player, true);
-            player.sendMessage(Component.text("You will lose your inventory when you die", NamedTextColor.RED));
+            optOuts.add(player);
+            storeOptOut(player, true, () -> notify(player));
             return true;
         default:
             usage(player);
@@ -69,19 +72,84 @@ public final class KeepInventoryPlugin extends JavaPlugin implements Listener {
             : Collections.emptyList();
     }
 
-    void usage(Player player) {
-        player.sendMessage(Component.text()
-                           .append(Component.text("Usage: ", NamedTextColor.GRAY))
-                           .append(Component.text("/keepinventory ", NamedTextColor.YELLOW))
-                           .append(Component.text("[on|off]", NamedTextColor.GOLD, TextDecoration.ITALIC))
-                           .build());
+    private void notify(Player player) {
+        final var message = optOuts.get(player)
+            ? text("You lose your inventory when you die", RED)
+            : text("You keep your inventory when you die", GREEN);
+        player.sendMessage(message
+                           .hoverEvent(textOfChildren(text("/keepinventory", GRAY),
+                                                      text(" [on|off]", GRAY, ITALIC)))
+                           .clickEvent(suggestCommand("/keepinventory "))
+                           .insertion("/keepinventory "));
+    }
+
+    private void usage(Player player) {
+        player.sendMessage(textOfChildren(text("Usage: ", GRAY),
+                                          text("/keepinventory ", YELLOW),
+                                          text("[on|off]", GOLD, ITALIC))
+                           .hoverEvent(textOfChildren(text("/keepinventory", GRAY),
+                                                      text(" [on|off]", GRAY, ITALIC)))
+                           .clickEvent(suggestCommand("/keepinventory "))
+                           .insertion("/keepinventory "));
+    }
+
+    private static String getPlayerKey(Player player) {
+        return "KeepInventory." + player.getUniqueId();
+    }
+
+    private void loadOptOut(Player player, Runnable callback) {
+        final String key = getPlayerKey(player);
+        Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
+                final boolean doOptOut = Redis.get(key) != null;
+                Bukkit.getScheduler().runTask(this, () -> {
+                        if (!player.isOnline()) return;
+                        if (doOptOut) {
+                            optOuts.add(player);
+                            getLogger().info(player.getName() + " is opted out");
+                        } else {
+                            optOuts.remove(player);
+                        }
+                        if (callback != null) callback.run();
+                    });
+            });
+    }
+
+    private void storeOptOut(Player player, boolean doOptOut, Runnable callback) {
+        final String key = getPlayerKey(player);
+        final String value = player.getName();
+        final int durationSeconds = 60 * 60 * 24; // 1 day
+        Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
+                if (doOptOut) {
+                    Redis.set(key, value, durationSeconds);
+                } else {
+                    Redis.del(key);
+                }
+                Bukkit.getScheduler().runTask(this, () -> {
+                        if (!player.isOnline()) return;
+                        if (callback != null) callback.run();
+                    });
+            });
+    }
+
+    @EventHandler
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        final Player player = event.getPlayer();
+        loadOptOut(player, () -> {
+                if (!optOuts.get(player)) return;
+                notify(player);
+            });
+    }
+
+    @EventHandler
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        optOuts.remove(event.getPlayer());
     }
 
     @EventHandler
     public void onPlayerDeath(PlayerDeathEvent event) {
         Player player = event.getEntity();
         if (player.getWorld().getGameRuleValue(GameRule.KEEP_INVENTORY)) return;
-        if (isOptedOut(player)) return;
+        if (optOuts.get(player)) return;
         event.setKeepInventory(true);
         event.getDrops().clear();
         switch (player.getWorld().getDifficulty()) {
@@ -94,52 +162,6 @@ public final class KeepInventoryPlugin extends JavaPlugin implements Listener {
             event.setNewExp(0);
             break;
         case HARD: default: break;
-        }
-    }
-
-    public OptOuts getOptOuts() {
-        if (optOuts == null) {
-            optOuts = loadOptOuts();
-        }
-        return optOuts;
-    }
-
-    public boolean isOptedOut(Player player) {
-        return getOptOuts().players.containsKey(player.getUniqueId());
-    }
-
-    public void setOptedOut(Player player, boolean val) {
-        if (isOptedOut(player) == val) return;
-        if (val) {
-            getOptOuts().players.put(player.getUniqueId(), player.getName());
-        } else {
-            getOptOuts().players.remove(player.getUniqueId());
-        }
-        saveOptOuts();
-    }
-
-    private File getOptOutsFile() {
-        return new File(getDataFolder(), "optouts.json");
-    }
-
-    private OptOuts loadOptOuts() {
-        try (FileReader fr = new FileReader(getOptOutsFile())) {
-            OptOuts result = gson.fromJson(fr, OptOuts.class);
-            return result != null ? result : new OptOuts();
-        } catch (FileNotFoundException fnfr) {
-            return new OptOuts();
-        } catch (IOException ioe) {
-            throw new IllegalStateException("Loading OptOuts", ioe);
-        }
-    }
-
-    private void saveOptOuts() {
-        if (optOuts == null) return;
-        getDataFolder().mkdirs();
-        try (FileWriter fw = new FileWriter(getOptOutsFile())) {
-            gson.toJson(optOuts, fw);
-        } catch (IOException ioe) {
-            throw new IllegalStateException("Saving OptOuts", ioe);
         }
     }
 }
