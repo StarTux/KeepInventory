@@ -2,7 +2,7 @@ name: KeepInventory
 description: Keep your inventory upon death
 author: StarTux
 version: 0.1
-api-version: '1.21.8'
+api-version: '1.21.10'
 website: https://cavetale.com
 main: com.winthier.keepinventory.KeepInventoryPlugin
 depend: [Connect]
